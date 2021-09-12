@@ -1,0 +1,19 @@
+domain: jgato.io
+layout:
+- go.kubebuilder.io/v3
+plugins:
+  manifests.sdk.operatorframework.io/v2: {}
+  scorecard.sdk.operatorframework.io/v2: {}
+projectName: my-first-operator
+repo: github.com/jgato/my-first-operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: jgato.io
+  group: my-first-operator
+  kind: MyOwnShell
+  path: github.com/jgato/my-first-operator/api/v1alpha1
+  version: v1alpha1
+version: "3"

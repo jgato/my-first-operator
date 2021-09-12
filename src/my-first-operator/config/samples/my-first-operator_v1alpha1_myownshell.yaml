@@ -1,0 +1,7 @@
+apiVersion: my-first-operator.jgato.io/v1alpha1
+kind: MyOwnShell
+metadata:
+  name: myownshell-sample
+spec:
+  # Add fields here
+  size: 3

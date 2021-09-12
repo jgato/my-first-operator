@@ -1,0 +1,34 @@
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - my-first-operator.jgato.io
+  resources:
+  - myownshells
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - my-first-operator.jgato.io
+  resources:
+  - myownshells/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - my-first-operator.jgato.io
+  resources:
+  - myownshells/status
+  verbs:
+  - get
+  - patch
+  - update

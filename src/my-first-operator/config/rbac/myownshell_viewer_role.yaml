@@ -1,0 +1,20 @@
+# permissions for end users to view myownshells.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: myownshell-viewer-role
+rules:
+- apiGroups:
+  - my-first-operator.jgato.io
+  resources:
+  - myownshells
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - my-first-operator.jgato.io
+  resources:
+  - myownshells/status
+  verbs:
+  - get

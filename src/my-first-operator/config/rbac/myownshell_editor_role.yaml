@@ -1,0 +1,24 @@
+# permissions for end users to edit myownshells.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: myownshell-editor-role
+rules:
+- apiGroups:
+  - my-first-operator.jgato.io
+  resources:
+  - myownshells
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - my-first-operator.jgato.io
+  resources:
+  - myownshells/status
+  verbs:
+  - get
