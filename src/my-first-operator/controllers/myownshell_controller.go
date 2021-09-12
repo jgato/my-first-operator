@@ -54,9 +54,11 @@ func (r *MyOwnShellReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// Fetch the  instance
 	myownshell := &myfirstoperatorv1alpha1.MyOwnShell{}
-	log.Info("Req", "string", req.String())
 
 	err := r.Get(ctx, req.NamespacedName, myownshell)
+	log.Info("*Resource info*", "Resource type", myownshell.Kind, "Resource Name", myownshell.Name)
+	log.Info("*Req info*", "string", req.String()) // which is the string combination of resource name and namespace
+
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -72,7 +74,10 @@ func (r *MyOwnShellReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// Check if the deployment already exists, if not create a new one
 	found := &appsv1.Deployment{}
+
 	err = r.Get(ctx, types.NamespacedName{Name: myownshell.Name, Namespace: myownshell.Namespace}, found)
+	log.Info("*Deployment info*", "deployment name", found.Name, "deployment size", found.Spec.Replicas, "requested size", myownshell.Spec.Size)
+
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new deployment
 		dep := r.deploymentForMyOwnShell(myownshell)

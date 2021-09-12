@@ -214,6 +214,10 @@ func (r *MyOwnShellReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
  // logic here
 }
 ```
+ * req only contains name of the request and the namespace (like an unique identifier)
+ * cxt ....
+
+So every time a change happens. Our Reconciler will be notified, but he only know that something happened with req.NameSpace/req.Name . It is up to the reconciler "to find out" what happened: looking for resources that should exists or not.
 
 We add the Reconcile function definition to the struct MyOwnShellReconciler. Now, it implements the Reconciler interface. This is how in Golang Interfaces classes are implemented. More [here](https://tour.golang.org/methods/10). 
 
