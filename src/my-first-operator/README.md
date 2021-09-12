@@ -592,4 +592,37 @@ Now you delete a MyOwnShell Resource you will see in the logs:
 
 ```
 
+We have added the Finalizer to the MyOwnShell, but it could be also added to other resources like our Deployment:
+
+```
+	// Add the finalizer for the Deployment
+	if !controllerutil.ContainsFinalizer(found, myOwnShellFinalizer) {
+		controllerutil.AddFinalizer(found, myOwnShellFinalizer)
+		err = r.Update(ctx, found)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+```
+
+```
+─> k get deployments.apps myownshell-sample -o yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: "2021-09-07T15:21:28Z"
+  finalizers:
+  - myownshell.my-first-operator.jgato.io/finalizer
+  generation: 1
+  name: myownshell-sample
+  namespace: default
+  ownerReferences:
+...
+...
+```
+
+If I delete the deployment it will be blocked the deletion. Why? There is no logic for putting away the Finalizer. We only have logic for detecting a delete on MyOwnShell Resource. But to add this logic is pretty simple and we can use the same logic than before, but extending it to the deployment
+
 

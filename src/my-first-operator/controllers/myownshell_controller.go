@@ -115,11 +115,12 @@ func (r *MyOwnShellReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// Check if the Memcached instance is marked to be deleted, which is
 	// indicated by the deletion timestamp being set.
-	isMemcachedMarkedToBeDeleted := myownshell.GetDeletionTimestamp() != nil
-	if isMemcachedMarkedToBeDeleted {
+	isMyOwnShellMarkedToBeDeleted := myownshell.GetDeletionTimestamp() != nil
+	isMyFoundMarkedToBeDeleted := found.GetDeletionTimestamp() != nil
+
+	if isMyOwnShellMarkedToBeDeleted || isMyFoundMarkedToBeDeleted {
 		if controllerutil.ContainsFinalizer(myownshell, myOwnShellFinalizer) {
 			// We do some logic
-			log.Info("Successfully finalized MyOwnShell")
 
 			// We say everything goes well. But we should control
 			// if something goes wrong, we dont delete finalizeer
@@ -130,11 +131,33 @@ func (r *MyOwnShellReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 			// Remove memcachedFinalizer. Once all finalizers have been
 			// removed, the object will be deleted.
-			controllerutil.RemoveFinalizer(myownshell, myOwnShellFinalizer)
-			err := r.Update(ctx, myownshell)
-			if err != nil {
-				return ctrl.Result{}, err
+			if isMyOwnShellMarkedToBeDeleted {
+				log.Info("Successfully finalized  MyOwnShell")
+				controllerutil.RemoveFinalizer(myownshell, myOwnShellFinalizer)
+				err := r.Update(ctx, myownshell)
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+				// if we quit the finalizer of the MyOwnShell, we have to
+				// put it away also in the Deployment
+				// Otherwise the CR will be deleted, but not the deployment
+				// that will keep waiting for the finalizer
+				log.Info("Successfully finalized  Deployment")
+				controllerutil.RemoveFinalizer(found, myOwnShellFinalizer)
+				err = r.Update(ctx, found)
+				if err != nil {
+					return ctrl.Result{}, err
+				}
 			}
+			if isMyFoundMarkedToBeDeleted {
+				log.Info("Successfully finalized  Deployment")
+				controllerutil.RemoveFinalizer(found, myOwnShellFinalizer)
+				err := r.Update(ctx, found)
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+			}
+
 		}
 		return ctrl.Result{}, nil
 	}
@@ -148,6 +171,14 @@ func (r *MyOwnShellReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
+	// Add the finalizer for the Deployment
+	if !controllerutil.ContainsFinalizer(found, myOwnShellFinalizer) {
+		controllerutil.AddFinalizer(found, myOwnShellFinalizer)
+		err = r.Update(ctx, found)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
 	// // Update the Memcached status with the pod names
 	// // List the pods for this memcached's deployment
 	// podList := &corev1.PodList{}
