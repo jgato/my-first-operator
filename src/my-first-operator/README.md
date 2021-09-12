@@ -314,11 +314,18 @@ and build and push:
 make docker-build docker-push
 ```
 
+
+
 Run it locally. But be sure your kubectl is pointing to a good cluster candidate and context.
 
 ```
 make install run
 
+```
+To run it locally, you dont need to build and push the Docker Image every time. You can just make:
+
+```
+make build install run
 ```
 
 Now we create our own CRD. There are some examples in config/samples
@@ -499,4 +506,90 @@ spec:
 Now it is easy to see how the owner is linked to its resources.
 
 If we delete a Pod from the Deployment, it will be generated. But this is just done by the K8S deployment logic. The Operator does nothing. Of course it will be invoked because a change happened but we did not created any logic about it.
+
+## Adding even more logic
+
+### Allowing updates
+
+Not the Operator finds the deployment, if not, it creates it. But, what happens if the original resource is updated? If you manually update the deployment size, I can guess that K8S will update the number of pods. But this is not the proper way. You should manage and update the size, with the CR MyOwnShell. 
+
+Now, with the actual code, the Reconciler only check for existing Deployment, and create it, if it does not exists. But, it should detect if existing, but the size should be updated.
+
+The code it is really easy, we take the MyOwnShell CR size, and we check if it is the same of the Deployment Replicas. If not, we update the Deployment Replicas number, and we let K8S to do all the stuff about the Deployment
+
+```
+	// Ensure the deployment size is the same as the spec
+	size := myownshell.Spec.Size
+	if *found.Spec.Replicas != size {
+		found.Spec.Replicas = &size
+		err = r.Update(ctx, found)
+		if err != nil {
+			log.Error(err, "Failed to update Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
+			return ctrl.Result{}, err
+		}
+		// Ask to requeue after 1 minute in order to give enough time for the
+		// pods be created on the cluster side and the operand be able
+		// to do the next update step accurately.
+		return ctrl.Result{RequeueAfter: time.Minute}, nil
+	}
+
+```
+
+### Adding finalizers
+
+Now, when a MyOwnShell is deleted we cannot make anything. Well, we dont need it. K8S will delete the Resource and all its related Resources. 
+
+For testing purpose, we will add a finalizer to be executed, before K8S make the job of deleting our pods. Just to log it.
+
+We add the Finalizer
+```
+	if !controllerutil.ContainsFinalizer(myownshell, myOwnShellFinalizer) {
+		controllerutil.AddFinalizer(myownshell, myOwnShellFinalizer)
+		err = r.Update(ctx, myownshell)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
+```
+
+Pretty simple. And now we add the code that will control the Finalizer when deleting the Resource:
+
+```
+isMyOwnShellMarkedToBeDeleted := myownshell.GetDeletionTimestamp() != nil
+	if isMyOwnShellMarkedToBeDeleted {
+		if controllerutil.ContainsFinalizer(myownshell, myOwnShellFinalizer) {
+			// We do some logic
+			log.Info("Successfully finalized MyOwnShell")
+
+			// We say everything goes well. But we should control
+			// if something goes wrong, we dont delete finalizeer
+			// in order to retry later
+			if false {
+				return ctrl.Result{}, err
+			}
+
+			// Remove memcachedFinalizer. Once all finalizers have been
+			// removed, the object will be deleted.
+			controllerutil.RemoveFinalizer(myownshell, myOwnShellFinalizer)
+			err := r.Update(ctx, myownshell)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+		return ctrl.Result{}, nil
+	}
+
+
+```
+We see that is MarkedToBeDeleted, but not deleted yet. It will not be deleted until we make our logic and execute the RemoveFinalizer.
+
+
+Now you delete a MyOwnShell Resource you will see in the logs:
+
+```
+2021-09-12T17:08:04.517+0200	INFO	controller-runtime.manager.controller.myownshell	Successfully finalized MyOwnShell	{"reconciler group": "my-first-operator.jgato.io", "reconciler kind": "MyOwnShell", "name": "myownshell-sample", "namespace": "default"}
+
+```
+
 

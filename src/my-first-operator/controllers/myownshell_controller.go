@@ -27,7 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
+	"time"
 )
 
 // MyOwnShellReconciler reconciles a MyOwnShell object
@@ -35,6 +37,8 @@ type MyOwnShellReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
+
+const myOwnShellFinalizer = "myownshell.my-first-operator.jgato.io/finalizer"
 
 //+kubebuilder:rbac:groups=my-first-operator.jgato.io,resources=myownshells,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=my-first-operator.jgato.io,resources=myownshells/status,verbs=get;update;patch
@@ -64,11 +68,11 @@ func (r *MyOwnShellReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			log.Info("Memcached resource not found. Ignoring since object must be deleted")
+			log.Info("MyOwnShell resource not found. Ignoring since object must be deleted")
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		log.Error(err, "Failed to get Memcached")
+		log.Error(err, "Failed to get MyOwnShell")
 		return ctrl.Result{}, err
 	}
 
@@ -94,20 +98,55 @@ func (r *MyOwnShellReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	// // Ensure the deployment size is the same as the spec
-	// size := memcached.Spec.Size
-	// if *found.Spec.Replicas != size {
-	// 	found.Spec.Replicas = &size
-	// 	err = r.Update(ctx, found)
-	// 	if err != nil {
-	// 		log.Error(err, "Failed to update Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
-	// 		return ctrl.Result{}, err
-	// 	}
-	// 	// Ask to requeue after 1 minute in order to give enough time for the
-	// 	// pods be created on the cluster side and the operand be able
-	// 	// to do the next update step accurately.
-	// 	return ctrl.Result{RequeueAfter: time.Minute}, nil
-	// }
+	// Ensure the deployment size is the same as the spec
+	size := myownshell.Spec.Size
+	if *found.Spec.Replicas != size {
+		found.Spec.Replicas = &size
+		err = r.Update(ctx, found)
+		if err != nil {
+			log.Error(err, "Failed to update Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
+			return ctrl.Result{}, err
+		}
+		// Ask to requeue after 1 minute in order to give enough time for the
+		// pods be created on the cluster side and the operand be able
+		// to do the next update step accurately.
+		return ctrl.Result{RequeueAfter: time.Minute}, nil
+	}
+
+	// Check if the Memcached instance is marked to be deleted, which is
+	// indicated by the deletion timestamp being set.
+	isMemcachedMarkedToBeDeleted := myownshell.GetDeletionTimestamp() != nil
+	if isMemcachedMarkedToBeDeleted {
+		if controllerutil.ContainsFinalizer(myownshell, myOwnShellFinalizer) {
+			// We do some logic
+			log.Info("Successfully finalized MyOwnShell")
+
+			// We say everything goes well. But we should control
+			// if something goes wrong, we dont delete finalizeer
+			// in order to retry later
+			if false {
+				return ctrl.Result{}, err
+			}
+
+			// Remove memcachedFinalizer. Once all finalizers have been
+			// removed, the object will be deleted.
+			controllerutil.RemoveFinalizer(myownshell, myOwnShellFinalizer)
+			err := r.Update(ctx, myownshell)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+		return ctrl.Result{}, nil
+	}
+
+	// Add finalizer for this CR
+	if !controllerutil.ContainsFinalizer(myownshell, myOwnShellFinalizer) {
+		controllerutil.AddFinalizer(myownshell, myOwnShellFinalizer)
+		err = r.Update(ctx, myownshell)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
 
 	// // Update the Memcached status with the pod names
 	// // List the pods for this memcached's deployment
