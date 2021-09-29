@@ -18,6 +18,9 @@ package controllers
 
 import (
 	"context"
+	"time"
+
+	"fmt"
 	myfirstoperatorv1alpha1 "github.com/jgato/my-first-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -29,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
-	"time"
 )
 
 // MyOwnShellReconciler reconciles a MyOwnShell object
@@ -98,6 +100,27 @@ func (r *MyOwnShellReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
+	foundCM := &corev1.ConfigMap{}
+	err = r.Get(ctx, types.NamespacedName{Name: myownshell.Name, Namespace: myownshell.Namespace}, foundCM)
+
+	if err != nil && errors.IsNotFound(err) {
+		// Define a new configmap
+		cm := r.configMapForMyOwnShell(myownshell)
+		log.Info("Creating a new ConfigMap", "Deployment.Namespace", cm.Namespace, "Deployment.Name", cm.Name)
+		err = r.Create(ctx, cm)
+		if err != nil {
+			log.Error(err, "Failed to create new ConfigMap", "Deployment.Namespace", cm.Namespace, "Deployment.Name", cm.Name)
+			return ctrl.Result{}, err
+		}
+		// Deployment created successfully - return and requeue
+		return ctrl.Result{Requeue: true}, nil
+	} else if err != nil {
+		log.Error(err, "Failed to get ConfigMap")
+		return ctrl.Result{}, err
+	}
+
+	err = r.Get(ctx, types.NamespacedName{Name: myownshell.Name, Namespace: myownshell.Namespace}, found)
+
 	// Ensure the deployment size is the same as the spec
 	size := myownshell.Spec.Size
 	if *found.Spec.Replicas != size {
@@ -105,6 +128,13 @@ func (r *MyOwnShellReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		err = r.Update(ctx, found)
 		if err != nil {
 			log.Error(err, "Failed to update Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
+			return ctrl.Result{}, err
+		}
+
+		foundCM.Data["replicas"] = fmt.Sprint(size)
+		err = r.Update(ctx, foundCM)
+		if err != nil {
+			log.Error(err, "Failed to update ConfigMap", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
 			return ctrl.Result{}, err
 		}
 		// Ask to requeue after 1 minute in order to give enough time for the
@@ -129,10 +159,16 @@ func (r *MyOwnShellReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				return ctrl.Result{}, err
 			}
 
-			// Remove memcachedFinalizer. Once all finalizers have been
+			// Remove myownshell and deployment finalizer. Once all finalizers have been
 			// removed, the object will be deleted.
 			if isMyOwnShellMarkedToBeDeleted {
 				log.Info("Successfully finalized  MyOwnShell")
+				r.Delete(ctx, foundCM)
+				if err != nil {
+					log.Error(err, "Failed to delete ConfirMap Created by MyOwnShell", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
+					return ctrl.Result{}, err
+				}
+				// Ask
 				controllerutil.RemoveFinalizer(myownshell, myOwnShellFinalizer)
 				err := r.Update(ctx, myownshell)
 				if err != nil {
@@ -143,6 +179,7 @@ func (r *MyOwnShellReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				// Otherwise the CR will be deleted, but not the deployment
 				// that will keep waiting for the finalizer
 				log.Info("Successfully finalized  Deployment")
+
 				controllerutil.RemoveFinalizer(found, myOwnShellFinalizer)
 				err = r.Update(ctx, found)
 				if err != nil {
@@ -179,28 +216,6 @@ func (r *MyOwnShellReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, err
 		}
 	}
-	// // Update the Memcached status with the pod names
-	// // List the pods for this memcached's deployment
-	// podList := &corev1.PodList{}
-	// listOpts := []client.ListOption{
-	// 	client.InNamespace(memcached.Namespace),
-	// 	client.MatchingLabels(labelsForMemcached(memcached.Name)),
-	// }
-	// if err = r.List(ctx, podList, listOpts...); err != nil {
-	// 	log.Error(err, "Failed to list pods", "Memcached.Namespace", memcached.Namespace, "Memcached.Name", memcached.Name)
-	// 	return ctrl.Result{}, err
-	// }
-	// podNames := getPodNames(podList.Items)
-
-	// // Update status.Nodes if needed
-	// if !reflect.DeepEqual(podNames, memcached.Status.Nodes) {
-	// 	memcached.Status.Nodes = podNames
-	// 	err := r.Status().Update(ctx, memcached)
-	// 	if err != nil {
-	// 		log.Error(err, "Failed to update Memcached status")
-	// 		return ctrl.Result{}, err
-	// 	}
-	// }
 
 	return ctrl.Result{}, nil
 
@@ -238,6 +253,20 @@ func (r *MyOwnShellReconciler) deploymentForMyOwnShell(m *myfirstoperatorv1alpha
 	// Set MyOwnShell instance as the owner and controller
 	ctrl.SetControllerReference(m, dep, r.Scheme)
 	return dep
+}
+
+// configMapForMyOwnShell returns a myownshell Deployment object
+func (r *MyOwnShellReconciler) configMapForMyOwnShell(m *myfirstoperatorv1alpha1.MyOwnShell) *corev1.ConfigMap {
+	replicas := m.Spec.Size
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      m.Name,
+			Namespace: m.Namespace,
+		},
+		Data: map[string]string{"replicas": fmt.Sprint(replicas)},
+	}
+
+	return cm
 }
 
 // labelsForMyOwnShell returns the labels for selecting the resources

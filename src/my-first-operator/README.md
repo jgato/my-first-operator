@@ -319,14 +319,14 @@ make docker-build docker-push
 Run it locally. But be sure your kubectl is pointing to a good cluster candidate and context.
 
 ```
-make install run
-
-```
-To run it locally, you dont need to build and push the Docker Image every time. You can just make:
-
-```
 make build install run
+
 ```
+
+ * build: builds the go code
+ * install: deploys in the cluster your CRD (not sure if also roles)
+ * run: run it locally
+To run it locally, you dont need to build and push the Docker Image every time.
 
 Now we create our own CRD. There are some examples in config/samples
 
