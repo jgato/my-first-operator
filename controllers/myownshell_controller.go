@@ -209,13 +209,13 @@ func (r *MyOwnShellReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// Add the finalizer for the Deployment
-	if !controllerutil.ContainsFinalizer(found, myOwnShellFinalizer) {
-		controllerutil.AddFinalizer(found, myOwnShellFinalizer)
-		err = r.Update(ctx, found)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-	}
+	//if !controllerutil.ContainsFinalizer(found, myOwnShellFinalizer) {
+	//	controllerutil.AddFinalizer(found, myOwnShellFinalizer)
+	//	err = r.Update(ctx, found)
+	//	if err != nil {
+	//		return ctrl.Result{}, err
+	//	}
+	//}
 
 	return ctrl.Result{}, nil
 
