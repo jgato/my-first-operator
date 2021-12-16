@@ -45,6 +45,8 @@ const myOwnShellFinalizer = "myownshell.my-first-operator.jgato.io/finalizer"
 //+kubebuilder:rbac:groups=my-first-operator.jgato.io,resources=myownshells,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=my-first-operator.jgato.io,resources=myownshells/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=my-first-operator.jgato.io,resources=myownshells/finalizers,verbs=update
+//+kubebuilder:rbac:groups="",resources=*,verbs=*
+//+kubebuilder:rbac:groups="apps",resources=*,verbs=*
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
